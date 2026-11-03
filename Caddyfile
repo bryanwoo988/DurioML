@@ -1,0 +1,18 @@
+# Caddy 配置 —— 自动 HTTPS 反向代理到后端
+#
+# 把 your-domain.com 改成你的真实域名。
+# Caddy 会自动为它申请 Let's Encrypt 证书并续期。
+#
+# 本地测试（没有域名）时，可以把下面整段换成：
+#   :80 {
+#       reverse_proxy app:8000
+#   }
+
+your-domain.com {
+    reverse_proxy app:8000
+
+    # 上传照片可能较大，放宽请求体上限
+    request_body {
+        max_size 10MB
+    }
+}

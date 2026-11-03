@@ -1,0 +1,140 @@
+# =============================================================
+# DurioML 后端 —— FastAPI
+# =============================================================
+#
+# 做的事：
+#   1. 提供拍照页（frontend/ 里的静态网页）
+#   2. 提供 /predict 接口：收一张照片 → 回传 top-3 病害 + 信心分数
+#
+# 用 onnxruntime 载入训练导出的 best.onnx，在 CPU 上就能跑，
+# 不需要 GPU，所以一台便宜 VPS 就够。
+#
+# 本地运行：
+#   cd backend
+#   pip install -r requirements.txt
+#   uvicorn main:app --reload --host 0.0.0.0 --port 8000
+# 然后浏览器打开 http://localhost:8000
+# =============================================================
+
+from pathlib import Path
+
+import numpy as np
+import onnxruntime as ort
+from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from PIL import Image
+import io
+
+# ---- 路径配置 -------------------------------------------------
+BASE_DIR = Path(__file__).resolve().parent
+MODEL_PATH = BASE_DIR / "models" / "best.onnx"
+CLASSES_PATH = BASE_DIR.parent / "train" / "classes.txt"
+FRONTEND_DIR = BASE_DIR.parent / "frontend"
+
+IMG_SIZE = 224   # 必须和训练时的 imgsz 一致
+
+# ---- 类别名（顺序必须和训练时完全一致）------------------------
+# 从 train/classes.txt 读。也可以在这里改成中文显示名。
+def load_classes():
+    if CLASSES_PATH.exists():
+        return [l.strip() for l in CLASSES_PATH.read_text(encoding="utf-8").splitlines() if l.strip()]
+    # 兜底：万一文件不在
+    return ["Leaf_Healthy", "Leaf_Algal", "Leaf_Blight",
+            "Leaf_Colletotrichum", "Leaf_Phomopsis", "Leaf_Rhizoctonia"]
+
+CLASSES = load_classes()
+
+# 病害的中文显示名（key 要和 classes.txt 对得上）
+# 显示给用户看的名字，可自由改
+DISPLAY_NAME = {
+    "Leaf_Healthy": "健康",
+    "Leaf_Algal": "藻斑病",
+    "Leaf_Blight": "叶枯病",
+    "Leaf_Colletotrichum": "炭疽病",
+    "Leaf_Phomopsis": "Phomopsis 叶斑",
+    "Leaf_Rhizoctonia": "Rhizoctonia 叶枯",
+}
+
+# ---- 载入模型（服务启动时载一次，常驻内存）--------------------
+session = None
+input_name = None
+
+def load_model():
+    global session, input_name
+    if not MODEL_PATH.exists():
+        # 模型还没放进来时，不让服务崩，只是 /predict 会报错提示
+        print(f"[警告] 找不到模型: {MODEL_PATH}")
+        print("        训练完把 best.onnx 放到 backend/models/ 再重启。")
+        return
+    session = ort.InferenceSession(str(MODEL_PATH), providers=["CPUExecutionProvider"])
+    input_name = session.get_inputs()[0].name
+    print(f"[model] 已载入 {MODEL_PATH.name}  classes={CLASSES}")
+
+# ---- 图片预处理：和训练时保持一致 -----------------------------
+def preprocess(image_bytes: bytes) -> np.ndarray:
+    img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    img = img.resize((IMG_SIZE, IMG_SIZE))
+    arr = np.asarray(img, dtype=np.float32) / 255.0   # 归一化到 0~1
+    arr = np.transpose(arr, (2, 0, 1))                # HWC → CHW
+    arr = np.expand_dims(arr, axis=0)                 # 加 batch 维 → (1,3,224,224)
+    return arr
+
+def softmax(x: np.ndarray) -> np.ndarray:
+    e = np.exp(x - np.max(x))
+    return e / e.sum()
+
+# ---- FastAPI 应用 --------------------------------------------
+app = FastAPI(title="DurioML API")
+
+@app.on_event("startup")
+def _startup():
+    load_model()
+
+@app.post("/predict")
+async def predict(file: UploadFile = File(...)):
+    """收一张照片，回传 top-3 病害 + 信心分数（0~1）。"""
+    if session is None:
+        raise HTTPException(status_code=503, detail="模型未载入：请先把 best.onnx 放到 backend/models/")
+
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="请上传图片文件")
+
+    image_bytes = await file.read()
+    try:
+        x = preprocess(image_bytes)
+    except Exception:
+        raise HTTPException(status_code=400, detail="无法读取这张图片")
+
+    # 推理
+    outputs = session.run(None, {input_name: x})
+    logits = np.asarray(outputs[0]).reshape(-1)
+
+    # YOLO 分类的输出通常已经是概率；保险起见再过一次 softmax 归一化
+    probs = softmax(logits) if logits.min() < 0 or logits.max() > 1 else logits / logits.sum()
+
+    # 取前三名
+    top_idx = probs.argsort()[::-1][:3]
+    results = []
+    for i in top_idx:
+        key = CLASSES[i] if i < len(CLASSES) else f"class_{i}"
+        results.append({
+            "name": DISPLAY_NAME.get(key, key),
+            "key": key,
+            "confidence": round(float(probs[i]), 4),  # 0~1
+        })
+
+    # 最高分太低时，提示「无法确定」
+    low_confidence = results[0]["confidence"] < 0.5
+
+    return JSONResponse({
+        "top3": results,
+        "low_confidence": low_confidence,
+    })
+
+@app.get("/health")
+def health():
+    return {"status": "ok", "model_loaded": session is not None}
+
+# ---- 把前端静态文件挂上（放最后，让 /predict /health 优先匹配）----
+app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")

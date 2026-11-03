@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#1b5e20" />
+  <title>DurioML · 榴莲叶病害识别</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>🌿 DurioML</h1>
+    <p class="sub">拍一张榴莲叶照片，看看可能是什么病</p>
+  </header>
+
+  <main>
+    <!-- 拍照 / 选图。capture="environment" 让手机直接调后置相机 -->
+    <label class="camera-btn" id="pickBtn">
+      📷 拍照 / 选择照片
+      <input type="file" id="fileInput" accept="image/*" capture="environment" hidden />
+    </label>
+
+    <!-- 预览 -->
+    <div id="preview" class="preview hidden">
+      <img id="previewImg" alt="预览" />
+    </div>
+
+    <!-- 状态 -->
+    <p id="status" class="status"></p>
+
+    <!-- 结果 -->
+    <section id="results" class="results hidden">
+      <h2>最可能的病害（前三）</h2>
+      <ul id="resultList"></ul>
+      <p id="lowConfidence" class="warn hidden">
+        ⚠️ 信心不高，无法确定。建议补拍清晰照片，或咨询农业专家。
+      </p>
+    </section>
+  </main>
+
+  <footer>
+    <p>辅助判断工具，不能替代专家。严重病害请找专业人士确认。</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

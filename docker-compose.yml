@@ -1,0 +1,35 @@
+# DurioML 部署编排：后端(app) + Caddy(自动 HTTPS)
+#
+# 上线步骤（在 VPS 上，已装 Docker）：
+#   1. 把 Caddyfile 里的 your-domain.com 改成你的域名
+#   2. 域名的 DNS A 记录指向这台 VPS 的 IP
+#   3. 把训练好的 best.onnx 放到 backend/models/
+#   4. docker compose up -d
+# Caddy 会自动申请并续期 HTTPS 证书。
+
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    volumes:
+      # 把本机的模型文件夹挂进容器，换模型不用重建镜像
+      - ./backend/models:/app/backend/models
+    expose:
+      - "8000"
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+volumes:
+  caddy_data:
+  caddy_config:

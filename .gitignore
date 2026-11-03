@@ -1,0 +1,18 @@
+# 模型文件（大，不进 git；通过挂载卷部署）
+backend/models/*.onnx
+backend/models/*.pt
+
+# 训练产物
+train/runs/
+train/durioml/
+*.pt
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+
+# 系统
+.DS_Store
