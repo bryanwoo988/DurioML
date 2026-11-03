@@ -11,11 +11,12 @@
 // 要把模型下载进浏览器，那是另一套做法（第三阶段再说）。
 // =============================================================
 
-const CACHE = "durioml-v1";
+const CACHE = "durioml-v2";
 const ASSETS = [
   "./",
   "./index.html",
   "./style.css",
+  "./i18n.js",
   "./app.js",
   "./manifest.json",
 ];
