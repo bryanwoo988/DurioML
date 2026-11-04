@@ -13,6 +13,7 @@
 const UI_TEXT = {
   zh: {
     subtitle: "拍一张榴莲叶照片，看看可能是什么病",
+    scope: "目前可识别：藻斑病、叶枯病、炭疽病、Phomopsis 叶斑、Rhizoctonia 叶枯、健康叶。暂不支持虫害。",
     pick: "📷 拍照 / 选择照片",
     status_detecting: "识别中…",
     results_title: "最可能的病害（前三）",
@@ -22,6 +23,7 @@ const UI_TEXT = {
   },
   en: {
     subtitle: "Take a photo of a durian leaf to see possible diseases",
+    scope: "Currently recognizes: algal leaf spot, leaf blight, anthracnose, Phomopsis spot, Rhizoctonia blight, healthy leaves. Pests are not supported yet.",
     pick: "📷 Take / choose a photo",
     status_detecting: "Analyzing…",
     results_title: "Most likely diseases (top 3)",
@@ -31,6 +33,7 @@ const UI_TEXT = {
   },
   ms: {
     subtitle: "Ambil gambar daun durian untuk lihat kemungkinan penyakit",
+    scope: "Boleh dikenal pasti: bintik alga, hawar daun, antraknos, bintik Phomopsis, hawar Rhizoctonia, daun sihat. Serangan perosak belum disokong.",
     pick: "📷 Ambil / pilih gambar",
     status_detecting: "Menganalisis…",
     results_title: "Penyakit paling berkemungkinan (3 teratas)",
