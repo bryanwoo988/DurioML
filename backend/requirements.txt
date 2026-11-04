@@ -6,3 +6,4 @@ numpy>=2.0
 python-multipart>=0.0.20
 google-api-python-client>=2.100
 google-auth>=2.20
+qrcode>=7.4

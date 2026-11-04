@@ -3,7 +3,8 @@
 # =============================================================
 #
 # 文件夹结构（和训练用的 dataset 一样，一个类别一个文件夹）：
-#   Google Drive / DurioML / Leaf_Algal / 20261105_093012_a1b2.jpg
+#   Google Drive / DurioML / Leaf_Algal / 阿明_20261105_093012_a1b2.jpg
+#   文件名 = 拍照者名字_日期_时间_随机码
 #                          / Leaf_Psyllid / ...
 #
 # 同时在服务器本地存一份备份：backend/collected/<类别>/...
@@ -19,10 +20,12 @@
 import hmac
 import io
 import os
+import re
 import secrets
 import threading
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import APIRouter, File, Form, Header, HTTPException, UploadFile
 
@@ -123,6 +126,21 @@ class DriveUploader:
 drive = DriveUploader()
 
 
+# ---- 文件名 ---------------------------------------------------
+
+def safe_name(name):
+    """拍照者名字放进文件名前先清理：只留文字、数字、- 和 _，最多 24 个字。"""
+    cleaned = re.sub(r"[^\w\-]+", "-", (name or "").strip(), flags=re.UNICODE).strip("-_")
+    return cleaned[:24] or "unknown"
+
+
+def safe_time(taken_at):
+    """手机传来的拍照时间（手机当地时间）。格式不对就用服务器时间。"""
+    if taken_at and re.fullmatch(r"\d{8}_\d{6}", taken_at):
+        return taken_at
+    return f"{datetime.now():%Y%m%d_%H%M%S}"
+
+
 # ---- API ------------------------------------------------------
 
 @router.get("/collect/labels")
@@ -141,6 +159,8 @@ def collect(
     file: UploadFile = File(...),
     label: str = Form(...),
     ai_guess: str = Form(default=""),
+    contributor: str = Form(default=""),
+    taken_at: str = Form(default=""),
     x_collect_token: str = Header(default=""),
 ):
     """存一张照片：本地备份一份，再上传到 Google Drive 的类别文件夹。"""
@@ -152,7 +172,8 @@ def collect(
 
     data = file.file.read()   # 原图，不压缩，保留画质给训练用
     ext = {"image/png": ".png", "image/webp": ".webp", "image/heic": ".heic"}.get(file.content_type, ".jpg")
-    filename = f"{datetime.now():%Y%m%d_%H%M%S}_{secrets.token_hex(2)}{ext}"
+    who = safe_name(contributor)
+    filename = f"{who}_{safe_time(taken_at)}_{secrets.token_hex(2)}{ext}"
 
     # 1. 本地备份（就算 Drive 失败，照片也不会丢）
     local_path = LOCAL_DIR / label / filename
@@ -165,7 +186,7 @@ def collect(
         try:
             # 把模型当时的猜测记在文件说明里，之后可以分析模型在哪里猜错
             drive_id = drive.upload(label, filename, data, file.content_type,
-                                    description=f"label={label}; ai_guess={ai_guess}")
+                                    description=f"label={label}; by={who}; ai_guess={ai_guess}")
         except Exception as e:
             drive_error = str(e)[:200]
 
@@ -177,3 +198,24 @@ def collect(
         "drive": drive_id is not None,
         "drive_error": drive_error,
     }
+
+
+@router.get("/collect/invite")
+def invite(origin: str, x_collect_token: str = Header(default="")):
+    """邀请朋友帮忙拍：回传带邀请码的网址，以及它的 QR code（SVG）。
+
+    origin 是前端自己的网址（例如 https://durioml.example.com），
+    这样在 Mac 本地测试和正式上线时产生的连结都对。
+    """
+    check_token(x_collect_token)
+    if not re.fullmatch(r"https?://[^/\s?#]+", origin):
+        raise HTTPException(status_code=400, detail="网址格式不对")
+
+    import qrcode
+    import qrcode.image.svg
+
+    url = f"{origin}/?join={quote(x_collect_token, safe='')}"
+    img = qrcode.make(url, image_factory=qrcode.image.svg.SvgPathImage, box_size=10, border=2)
+    buf = io.BytesIO()
+    img.save(buf)
+    return {"url": url, "svg": buf.getvalue().decode("utf-8")}
