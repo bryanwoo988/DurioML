@@ -16,6 +16,7 @@
 # 然后浏览器打开 http://localhost:8000
 # =============================================================
 
+import ast
 from pathlib import Path
 
 import numpy as np
@@ -40,8 +41,9 @@ def load_classes():
     if CLASSES_PATH.exists():
         return [l.strip() for l in CLASSES_PATH.read_text(encoding="utf-8").splitlines() if l.strip()]
     # 兜底：万一文件不在
-    return ["Leaf_Healthy", "Leaf_Algal", "Leaf_Blight",
-            "Leaf_Colletotrichum", "Leaf_Phomopsis", "Leaf_Rhizoctonia"]
+    # YOLO 按文件夹名的字母顺序编号，所以这里也要按字母排
+    return ["Leaf_Algal", "Leaf_Blight", "Leaf_Colletotrichum",
+            "Leaf_Healthy", "Leaf_Phomopsis", "Leaf_Rhizoctonia"]
 
 CLASSES = load_classes()
 
@@ -69,6 +71,17 @@ def load_model():
         return
     session = ort.InferenceSession(str(MODEL_PATH), providers=["CPUExecutionProvider"])
     input_name = session.get_inputs()[0].name
+
+    # Ultralytics 导出 ONNX 时会把类别名写进模型 metadata。
+    # 优先用模型自带的类别顺序，避免和 classes.txt 对不上。
+    global CLASSES
+    meta = session.get_modelmeta().custom_metadata_map
+    if "names" in meta:
+        try:
+            names = ast.literal_eval(meta["names"])  # 形如 {0: 'Leaf_Algal', ...}
+            CLASSES = [names[i] for i in sorted(names)]
+        except Exception:
+            pass
     print(f"[model] 已载入 {MODEL_PATH.name}  classes={CLASSES}")
 
 # ---- 图片预处理：和训练时保持一致 -----------------------------

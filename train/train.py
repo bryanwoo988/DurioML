@@ -40,7 +40,7 @@ from ultralytics import YOLO
 
 # dataset 根目录（里面要有 train/ 和 val/ 子文件夹）
 # Kaggle 上通常是 /kaggle/input/<dataset名>/<可能还有一层>
-DATA_DIR = "/kaggle/input/durianleafsubset2"   # ← 按实际路径改
+DATA_DIR = "/kaggle/input/datasets/nguynphancminh/durianleafsubset2/dataset_split"   # ← 按实际路径改
 
 # 用哪个预训练模型做底子：
 #   yolo11n-cls.pt  最小最快，手机/CPU 部署首选（先用这个）
@@ -50,7 +50,7 @@ MODEL = "yolo11n-cls.pt"
 EPOCHS = 100        # 训练轮数。先 100，看验证曲线再调
 IMGSZ = 224         # 输入图片尺寸，分类常用 224
 BATCH = 32          # 一次喂多少张。Kaggle T4 设 32~64；设 -1 自动
-PROJECT = "durioml" # 输出文件夹名
+PROJECT = "/kaggle/working/durioml"  # 输出文件夹（Kaggle 右侧 Output 看得到）
 NAME = "cls_v1"     # 本次训练的名字
 
 # ---- 2. 训练 --------------------------------------------------
@@ -80,14 +80,16 @@ results = model.train(
 # ---- 3. 导出成 ONNX（后端要用的格式）---------------------------
 
 # best.pt 是训练过程中验证集表现最好的那个模型
-best_model = YOLO(f"{PROJECT}/{NAME}/weights/best.pt")
+# 用 trainer 记录的路径，重复训练时文件夹名变成 cls_v12 也不会找错
+best_pt = model.trainer.best
+best_model = YOLO(best_pt)
 
 # 导出 ONNX。opset=12 对浏览器/各种运行时兼容性好
 onnx_path = best_model.export(format="onnx", imgsz=IMGSZ, opset=12)
 
 print("=" * 50)
 print("训练完成！")
-print(f"PyTorch 模型: {PROJECT}/{NAME}/weights/best.pt")
+print(f"PyTorch 模型: {best_pt}")
 print(f"ONNX 模型（后端用）: {onnx_path}")
 print("把这个 best.onnx 下载下来，放进 backend/models/")
 print("=" * 50)
@@ -95,6 +97,11 @@ print("=" * 50)
 # ---- 4.（可选）快速看看模型在验证集上的表现 --------------------
 # 训练日志里会打印 top-1 / top-5 准确率，
 # 以及混淆矩阵图（存在 runs 文件夹里），用来看哪两类容易认错。
-metrics = best_model.val()
+metrics = best_model.val(data=DATA_DIR, split="val")
 print("验证集 top-1 准确率:", metrics.top1)
 print("验证集 top-5 准确率:", metrics.top5)
+
+# ---- 5. 用测试集做最终评估（训练和挑模型都没用过这批图，分数最可信）----
+test_metrics = best_model.val(data=DATA_DIR, split="test")
+print("测试集 top-1 准确率:", test_metrics.top1)
+print("测试集 top-5 准确率:", test_metrics.top5)

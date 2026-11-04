@@ -1,6 +1,6 @@
-Leaf_Healthy
 Leaf_Algal
 Leaf_Blight
 Leaf_Colletotrichum
+Leaf_Healthy
 Leaf_Phomopsis
 Leaf_Rhizoctonia

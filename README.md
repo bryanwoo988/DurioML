@@ -108,6 +108,12 @@ Caddy 会自动申请 HTTPS 证书。详见 `docker-compose.yml`。
 
 ---
 
+## 数据来源
+
+- Training data: [VNDurLeaf](https://www.kaggle.com/datasets/nguynphancminh/durianleafsubset2) (Kaggle, Nguyễn Phan Đức Minh), Apache License 2.0
+
+---
+
 ## 注意事项
 
 - 本工具是**辅助判断**，不能替代农业专家。严重病害请找专业人士确认。
