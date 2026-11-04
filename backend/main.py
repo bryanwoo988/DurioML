@@ -5,6 +5,7 @@
 # 做的事：
 #   1. 提供拍照页（frontend/ 里的静态网页）
 #   2. 提供 /predict 接口：收一张照片 → 回传 top-3 病害 + 信心分数
+#   3. 收集模式 /collect：照片按类别存进 Google Drive（见 collect.py）
 #
 # 用 onnxruntime 载入训练导出的 best.onnx，在 CPU 上就能跑，
 # 不需要 GPU，所以一台便宜 VPS 就够。
@@ -12,7 +13,7 @@
 # 本地运行：
 #   cd backend
 #   pip install -r requirements.txt
-#   uvicorn main:app --reload --host 0.0.0.0 --port 8000
+#   uvicorn main:app --host 0.0.0.0 --port 8000 --env-file .env
 # 然后浏览器打开 http://localhost:8000
 # =============================================================
 
@@ -27,6 +28,8 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image, ImageOps
 import io
+
+from collect import router as collect_router
 
 # ---- 路径配置 -------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent
@@ -163,6 +166,8 @@ def health():
 def classes():
     """当前模型认得的类别，前端用它显示「目前可识别」。"""
     return {"classes": CLASSES if session is not None else []}
+
+app.include_router(collect_router)
 
 # ---- 把前端静态文件挂上（放最后，让 /predict /health 优先匹配）----
 app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")

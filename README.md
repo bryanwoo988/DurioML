@@ -99,6 +99,45 @@ Caddy 会自动申请 HTTPS 证书。详见 `docker-compose.yml`。
 
 ---
 
+## 收集模式（拍照 → 选类别 → 存进 Google Drive）
+
+只有知道密码的人能用。拍照后模型先猜一次，你再按正确的类别，
+照片会存进 Google Drive 的 `DurioML/<类别>/` 文件夹，服务器上也留一份备份（`backend/collected/`）。
+文件夹结构和训练用的 dataset 一样，可以直接拿去训练分类模型，也可以拿到 Roboflow 画框。
+
+### 一次性设定 Google Drive（约 20–30 分钟）
+
+1. 打开 https://console.cloud.google.com ，左上角新建项目，名字填 `DurioML`
+2. 左边菜单 **APIs & Services → Library**，搜 `Google Drive API` → **Enable**
+3. **APIs & Services → OAuth consent screen**（新版叫 Google Auth Platform）
+   - User type 选 **External**，App name 填 `DurioML`，email 填你自己的
+   - Scopes 不用加
+   - **Publishing status 按 Publish app，改成 In production**
+     （停在 Testing 的话，授权 7 天后会失效，要重新授权）
+4. **APIs & Services → Credentials → Create Credentials → OAuth client ID**
+   - Application type 选 **Desktop app** → Create → **Download JSON**
+   - 把下载的文件改名成 `client_secret.json`，放进 `backend/` 文件夹
+5. 在 Mac 终端机（`backend` 文件夹里，已经 `source .venv/bin/activate`）：
+   ```bash
+   pip install -r requirements.txt google-auth-oauthlib
+   python get_drive_token.py
+   ```
+   浏览器会打开 Google 登录页：选你的帐号 → 如果出现「Google 尚未验证这个应用」，点 **进阶 → 前往 DurioML** → 允许。
+   完成后终端机会显示**收集模式密码**，设定会自动写进 `backend/.env`。
+6. 以后启动后端都加上 `--env-file .env`：
+   ```bash
+   uvicorn main:app --host 0.0.0.0 --port 8000 --env-file .env
+   ```
+
+`backend/.env` 和 `client_secret.json` 等于你 Google 帐号的钥匙，**不会**被 git 上传（已写进 `.gitignore`），也不要传给别人。
+
+### 使用
+
+页面最下面点 **收集模式** → 输入密码 → 拍照 → 按类别。
+没有设定 Google Drive 时，照片只存在服务器的 `backend/collected/`，页面会提示。
+
+---
+
 ## 路线图
 
 - [x] 第一阶段：公开 dataset 打通链路（分类，top-3）

@@ -11,9 +11,14 @@ services:
   app:
     build: .
     restart: unless-stopped
+    env_file:
+      # 收集模式的密码和 Google Drive 授权（用 backend/get_drive_token.py 生成）
+      - ./backend/.env
     volumes:
       # 把本机的模型文件夹挂进容器，换模型不用重建镜像
       - ./backend/models:/app/backend/models
+      # 收集到的照片本地备份，容器重建也不会丢
+      - ./backend/collected:/app/backend/collected
     expose:
       - "8000"
 

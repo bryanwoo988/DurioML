@@ -11,7 +11,7 @@
 // 要把模型下载进浏览器，那是另一套做法（第三阶段再说）。
 // =============================================================
 
-const CACHE = "durioml-v4";
+const CACHE = "durioml-v5";
 const ASSETS = [
   "./",
   "./index.html",
@@ -42,7 +42,7 @@ self.addEventListener("activate", (e) => {
 //  - 其他（界面文件）→ 先用缓存，没有再走网络
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
-  if (url.pathname.startsWith("/predict") || url.pathname.startsWith("/health") || url.pathname.startsWith("/classes")) {
+  if (url.pathname.startsWith("/predict") || url.pathname.startsWith("/health") || url.pathname.startsWith("/classes") || url.pathname.startsWith("/collect")) {
     return; // 交给浏览器正常联网
   }
   e.respondWith(

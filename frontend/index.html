@@ -19,6 +19,7 @@
         <option value="ms">BM</option>
       </select>
     </div>
+    <p id="collectBadge" class="badge hidden" data-i18n="collect_badge"></p>
     <p class="sub" data-i18n="subtitle"></p>
     <p class="scope hidden" id="scope"></p>
   </header>
@@ -44,10 +45,18 @@
       <ul id="resultList"></ul>
       <p id="lowConfidence" class="warn hidden" data-i18n="low_confidence"></p>
     </section>
+
+    <!-- 收集模式：选类别，存进 Google Drive 对应的文件夹 -->
+    <section id="collectBox" class="results hidden">
+      <h2 data-i18n="collect_title"></h2>
+      <div id="labelGrid" class="label-grid"></div>
+    </section>
+    <p id="collectStatus" class="status"></p>
   </main>
 
   <footer>
     <p data-i18n="disclaimer"></p>
+    <button id="collectToggle" class="link-btn" type="button"></button>
   </footer>
 
   <script src="i18n.js"></script>
