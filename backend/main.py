@@ -159,5 +159,10 @@ async def predict(file: UploadFile = File(...)):
 def health():
     return {"status": "ok", "model_loaded": session is not None}
 
+@app.get("/classes")
+def classes():
+    """当前模型认得的类别，前端用它显示「目前可识别」。"""
+    return {"classes": CLASSES if session is not None else []}
+
 # ---- 把前端静态文件挂上（放最后，让 /predict /health 优先匹配）----
 app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")

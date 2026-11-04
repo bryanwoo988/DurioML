@@ -3,4 +3,5 @@ Leaf_Blight
 Leaf_Colletotrichum
 Leaf_Healthy
 Leaf_Phomopsis
+Leaf_Psyllid
 Leaf_Rhizoctonia

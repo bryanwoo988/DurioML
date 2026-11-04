@@ -27,6 +27,7 @@ function detectLang() {
 
 let currentLang = detectLang();
 let lastData = null;  // 存最近一次结果，切语言时重新渲染
+let modelClasses = [];  // 后端模型认得的类别（从 /classes 拿）
 
 // 把所有带 data-i18n 的元素按当前语言填好文字
 function applyLang() {
@@ -36,6 +37,7 @@ function applyLang() {
     const key = el.getAttribute("data-i18n");
     if (t[key]) el.textContent = t[key];
   });
+  renderScope();
   // 结果区如果已有数据，用新语言重画
   if (lastData) renderResults(lastData);
 }
@@ -115,8 +117,34 @@ function renderResults(data) {
   resultsBox.classList.remove("hidden");
 }
 
+// ---- 「目前可识别」：按模型实际认得的类别显示 ----------------
+const scopeEl = document.getElementById("scope");
+
+function renderScope() {
+  if (!modelClasses.length) {
+    scopeEl.classList.add("hidden");
+    return;
+  }
+  const t = UI_TEXT[currentLang];
+  const names = modelClasses.map((k) => diseaseName(k, currentLang));
+  scopeEl.textContent = t.scope_prefix + names.join(t.scope_sep) + t.scope_suffix;
+  scopeEl.classList.remove("hidden");
+}
+
+async function loadClasses() {
+  try {
+    const resp = await fetch("/classes");
+    const data = await resp.json();
+    modelClasses = data.classes || [];
+  } catch (e) {
+    modelClasses = [];  // 没网或后端没开：不显示这一行
+  }
+  renderScope();
+}
+
 // ---- 初始化 --------------------------------------------------
 applyLang();
+loadClasses();
 
 // service worker（PWA）
 if ("serviceWorker" in navigator) {
