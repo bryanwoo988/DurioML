@@ -24,7 +24,7 @@ import onnxruntime as ort
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from PIL import Image
+from PIL import Image, ImageOps
 import io
 
 # ---- 路径配置 -------------------------------------------------
@@ -86,8 +86,16 @@ def load_model():
 
 # ---- 图片预处理：和训练时保持一致 -----------------------------
 def preprocess(image_bytes: bytes) -> np.ndarray:
-    img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-    img = img.resize((IMG_SIZE, IMG_SIZE))
+    img = Image.open(io.BytesIO(image_bytes))
+    img = ImageOps.exif_transpose(img).convert("RGB")  # 手机照片按拍摄方向转正
+
+    # 和 YOLO 分类验证时一样：短边缩到 224，再从中间裁出 224x224（不压扁变形）
+    w, h = img.size
+    scale = IMG_SIZE / min(w, h)
+    img = img.resize((max(IMG_SIZE, round(w * scale)), max(IMG_SIZE, round(h * scale))), Image.BILINEAR)
+    w, h = img.size
+    left, top = (w - IMG_SIZE) // 2, (h - IMG_SIZE) // 2
+    img = img.crop((left, top, left + IMG_SIZE, top + IMG_SIZE))
     arr = np.asarray(img, dtype=np.float32) / 255.0   # 归一化到 0~1
     arr = np.transpose(arr, (2, 0, 1))                # HWC → CHW
     arr = np.expand_dims(arr, axis=0)                 # 加 batch 维 → (1,3,224,224)

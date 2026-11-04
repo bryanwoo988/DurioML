@@ -52,20 +52,47 @@ IMGSZ = 224         # 输入图片尺寸，分类常用 224
 BATCH = 32          # 一次喂多少张。Kaggle T4 设 32~64；设 -1 自动
 PROJECT = "/kaggle/working/durioml"  # 输出文件夹（Kaggle 右侧 Output 看得到）
 NAME = "cls_v1"     # 本次训练的名字
+EXIST_OK = True     # 重跑时覆盖同名文件夹，路径不变
+
+# ---- 1.5 先把照片缩小一份（大幅加快训练）-----------------------
+# 原图很大，每一轮都要重新解码大图，CPU 跟不上，GPU 只能等。
+# 先缩成长边 384 存一份到 /kaggle/temp（不会占用 Output 空间），
+# 训练时每轮读小图，速度会快很多。模型输入只有 224，缩小不影响准确率。
+from pathlib import Path
+from PIL import Image, ImageOps
+
+SMALL_DIR = Path("/kaggle/temp/data_small")
+MAX_SIDE = 384
+
+if not SMALL_DIR.exists():
+    src = Path(DATA_DIR)
+    n = 0
+    for p in src.rglob("*"):
+        if p.suffix.lower() in {".jpg", ".jpeg", ".png"}:
+            out = (SMALL_DIR / p.relative_to(src)).with_suffix(".jpg")
+            out.parent.mkdir(parents=True, exist_ok=True)
+            img = ImageOps.exif_transpose(Image.open(p)).convert("RGB")  # 按照片的拍摄方向转正
+            img.thumbnail((MAX_SIDE, MAX_SIDE))
+            img.save(out, quality=92)
+            n += 1
+    print(f"已缩小 {n} 张照片 → {SMALL_DIR}")
+
+TRAIN_DATA = str(SMALL_DIR)
 
 # ---- 2. 训练 --------------------------------------------------
 
 # 载入预训练模型（第一次会自动下载权重）
 model = YOLO(MODEL)
 
-# 开始训练。结果会存到 runs/classify/<NAME>/
+# 开始训练。结果会存到 PROJECT/NAME/
 results = model.train(
-    data=DATA_DIR,
+    data=TRAIN_DATA,
     epochs=EPOCHS,
     imgsz=IMGSZ,
     batch=BATCH,
     project=PROJECT,
     name=NAME,
+    exist_ok=EXIST_OK,
     # ---- 数据增强（模拟真实拍照的各种变化，帮模型更耐用）----
     fliplr=0.5,     # 50% 概率左右翻转
     degrees=15,     # 随机旋转 ±15 度（拍照角度歪）
@@ -97,11 +124,11 @@ print("=" * 50)
 # ---- 4.（可选）快速看看模型在验证集上的表现 --------------------
 # 训练日志里会打印 top-1 / top-5 准确率，
 # 以及混淆矩阵图（存在 runs 文件夹里），用来看哪两类容易认错。
-metrics = best_model.val(data=DATA_DIR, split="val")
+metrics = best_model.val(data=TRAIN_DATA, split="val")
 print("验证集 top-1 准确率:", metrics.top1)
 print("验证集 top-5 准确率:", metrics.top5)
 
 # ---- 5. 用测试集做最终评估（训练和挑模型都没用过这批图，分数最可信）----
-test_metrics = best_model.val(data=DATA_DIR, split="test")
+test_metrics = best_model.val(data=TRAIN_DATA, split="test")
 print("测试集 top-1 准确率:", test_metrics.top1)
 print("测试集 top-5 准确率:", test_metrics.top5)
