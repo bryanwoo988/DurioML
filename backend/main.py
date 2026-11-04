@@ -17,6 +17,7 @@
 # =============================================================
 
 import ast
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import numpy as np
@@ -106,11 +107,12 @@ def softmax(x: np.ndarray) -> np.ndarray:
     return e / e.sum()
 
 # ---- FastAPI 应用 --------------------------------------------
-app = FastAPI(title="DurioML API")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    load_model()   # 服务启动时载入模型一次
+    yield
 
-@app.on_event("startup")
-def _startup():
-    load_model()
+app = FastAPI(title="DurioML API", lifespan=lifespan)
 
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
